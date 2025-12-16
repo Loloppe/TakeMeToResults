@@ -25,6 +25,11 @@ namespace TakeMeToResults.UI
         private ViewController mainScreenViewController;
         private FlowCoordinator deepestChildFlowCoordinator;
 
+        [Inject]
+        private LevelCollectionNavigationController levelCollectionNavigationController = null;
+
+        private SignalOnUIButtonClick SignalOnUIButtonClick;
+
         public event PropertyChangedEventHandler PropertyChanged;
         private readonly Action ShowOther;
 
@@ -40,6 +45,7 @@ namespace TakeMeToResults.UI
             this.mainFlowCoordinator = mainFlowCoordinator;
             this.presentFlowCoordinatorPatch = presentFlowCoordinatorPatch;
             ShowOther = ShowOtherViewControllers;
+            SignalOnUIButtonClick = titleViewController.transform.Find("BackButton").GetComponent<SignalOnUIButtonClick>();
         }
 
         public void Initialize()
@@ -47,13 +53,17 @@ namespace TakeMeToResults.UI
             BSMLParser.Instance.Parse(Utilities.GetResourceContent(Assembly.GetExecutingAssembly(), "TakeMeToResults.UI.Views.ResultsButton.bsml"), titleViewController.gameObject, this);
             resultsButtonTransform.gameObject.name = "TakeMeToResults";
             resultsViewController.continueButtonPressedEvent += GetViewControllers;
-            presentFlowCoordinatorPatch.FlowCoordinatorChanged += UpdateFlowAndButtonState;
+            levelCollectionNavigationController.didActivateEvent += DidActivate;
+            levelCollectionNavigationController.didChangeLevelDetailContentEvent += UpdateContent;
+            SignalOnUIButtonClick._buttonClickedSignal.Subscribe(OnBackButtonPressed);
         }
 
         public void Dispose()
         {
             resultsViewController.continueButtonPressedEvent -= GetViewControllers;
-            presentFlowCoordinatorPatch.FlowCoordinatorChanged -= UpdateFlowAndButtonState;
+            levelCollectionNavigationController.didActivateEvent -= DidActivate;
+            levelCollectionNavigationController.didChangeLevelDetailContentEvent -= UpdateContent;
+            SignalOnUIButtonClick._buttonClickedSignal.Unsubscribe(OnBackButtonPressed);
         }
 
         private void GetViewControllers(ResultsViewController resultsViewController)
@@ -69,9 +79,18 @@ namespace TakeMeToResults.UI
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ButtonActive)));
         }
 
-        private void UpdateFlowAndButtonState()
+        private void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
         {
-            deepestChildFlowCoordinator = mainFlowCoordinator.YoungestChildFlowCoordinatorOrSelf();
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ButtonActive)));
+        }
+
+        private void UpdateContent(LevelCollectionNavigationController a, StandardLevelDetailViewController.ContentType contentType)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ButtonActive)));
+        }
+
+        private void OnBackButtonPressed()
+        {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ButtonActive)));
         }
 
@@ -113,6 +132,6 @@ namespace TakeMeToResults.UI
         }
 
         [UIValue("button-active")]
-        private bool ButtonActive => mainScreenViewController != null && deepestChildFlowCoordinator is SinglePlayerLevelSelectionFlowCoordinator;
+        private bool ButtonActive => levelCollectionNavigationController != null && levelCollectionNavigationController.isActiveAndEnabled && resultsViewController._levelCompletionResults != null;
     }
 }
